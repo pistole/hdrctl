@@ -1,6 +1,9 @@
 #persistent
+#SingleInstance force
 
 lastFileContent := ""
+; ignore the original contents of the file to avoid accidentally re-launching
+fileread lastFileContent, %userprofile%\documents\keyspipe.txt
 setTimer, checkFile, 20
 return
 

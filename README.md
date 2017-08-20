@@ -75,13 +75,17 @@ lineup_status.json I think you can just copy unchanged
 curl  "http://192.168.0.41:80/lineup_status.json" > /var/www/html/lineup.json
 ```
 
-Proxy discovery api service:
+
+Proxy 65001 service (probably needed):
 (TBD)
 
-Proxy 65001 service:
-(TBD)
 
-Proxy the remaining ports:
+Proxy discovery api service (not sure if needed):
+
+Host hack/DNS hijack ipv4-api.hdhomerun.com to point to your proxy and use discover-api.py to generate your /discover file 
+
+
+Proxy the remaining ports (if needed):
 (TBD)
 
 
