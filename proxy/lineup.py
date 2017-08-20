@@ -24,7 +24,7 @@ def main(argv):
     for channel in data:
         channel.pop("DRM", None)
         channel_url = urlparse(channel['URL'])
-        channel['URL'] = channel_url.scheme + ":"+ proxy_host + ":5004" + channel_url.path
+        channel['URL'] = channel_url.scheme + "://"+ proxy_host + ":5004" + channel_url.path
         lineup_objs.append(channel)
         source = {
             "name": channel["GuideName"],
