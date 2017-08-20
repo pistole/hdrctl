@@ -7,3 +7,5 @@ The longterm goal is for this setup to behave like a HDHR with one tuner to clie
 ### What works?
 
 * Autohotkey script that reads from a file and sends the commands to the HDHRView app running on Windows 10
+
+
