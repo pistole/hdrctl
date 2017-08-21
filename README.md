@@ -2,7 +2,7 @@
 
 hdrctl is a proxy designed to swap out requests for DRM'd content with video output captured from a physical windows machine running the native HDHomeRunView application with changes to tuner channels done by emulating keystrokes on windows machine.
 
-The longterm goal is for this setup to behave like a HDHR with one tuner to clients incapable of handling the DRM streams (plex, kodi, android tv channels, etc).
+The goal is for this setup to behave like a HDHR with one tuner to clients incapable of handling the DRM streams, specifically for the plex dvr functionality.
 
 ### What works?
 
@@ -12,16 +12,34 @@ The longterm goal is for this setup to behave like a HDHR with one tuner to clie
 * channel.py which is invoked on a stream-open will write to the file that autohotkey on the windows machine is monitoring to change channels
 
 ### What doesn't work
-* still not enough to trick Plex into thinking it's a real HDHR, may need to implement the discovery protocol on tcp/udp 65001
+
+* This is enough to trick plex into thinking it's a real tuner and view live channels, but I haven't tried recording with it.
+* Sometimes plex just fails when trying to open the stream and I'm not sure why.
+* I'm pretty sure the buffering options hardcoded in lineup.py are probably too cautious and are introducing a lot of latency
+* The path to the keyspipe.txt file is hardcoded in channel.py
 
 ### Requirements
 1. HDHR Hardware
 2. Some kind of HDMI capture setup (I'm using a LKV373A)
-3. Windows machine with windows 10 that can run the HDHRView app and receive DRM'd channels
+3. Windows machine with windows 10 that can run the HDHRView app and receive DRM'd channels. You probably can't use it for anything else, so do not use your primary computer.
 4. Linux server (might be possible to run this on windows machine at your own risk), webserver running on port 80
-5. node-ffmpeg-mpegts-proxy installed
+5. node-ffmpeg-mpegts-proxy installed. I'm using a raspberry pi 3, which is probably overkill.
 
-### Directions (Don't actually work yet)
+### Directions
+
+#### Windows 10 Setup
+
+1. Install Auto-hotkey and the official HDHR client from the Windows store.
+2. Edit the keyreader.ahk file to point to a file somewhere you have shared on the network that you can access from your linux server.
+3. Make sure the file exists (default is c:\users\<yourusername>\Documents\keyspipe.txt)
+4. Start the script
+5. Start the HDHR client and fullscreen it
+
+#### Connections
+
+1. Connect the HDMI output from your windows machine to your HDMI capture setup. You may need to do something about HDCP, but that is beyond the scope of this document.
+
+#### Linux Setup
 
 The LKV373A boots in multicast mode and it assigns itself 192.168.1.238, so plug it directly into an ethernet card on your linux machine and bring it up:
 ```
@@ -35,12 +53,32 @@ The LKV373A boots in multicast mode and it assigns itself 192.168.1.238, so plug
 
 You might want to shove that into rc.local
 
-Install channel.py into /usr/local/bin
+Follow the directions on https://blog.danman.eu/new-version-of-lenkeng-hdmi-over-ip-extender-lkv373a/ or https://www.yodeck.com/news/any-hdmi-device-asvideo-infor-yodeck/ to re-flash the firmware to stick it into unicast mode permanantly
+
+Instead of the iptables command, you can recompile ffmpeg with this patch: https://github.com/danielkucera/FFmpeg/commit/3abb8bc887afd7c595669342978428fea22113ee but you're on your own if you try.
+
+Once you've permantly forced the TX unit into unicast mode, you can (probably) safely plug it into your network without all the multicast stuff.
+
+Configure a webserver (apache, nginx, whatever) that can serve static files on port 80. You'll need it later. For the purposes of my example the webroot is at /var/www/html, but it will vary depending on distro and server.
+
+
+mount the directory with the keyspipe.txt file from the windows machine on your server. I recommend seting up autofs to make sure it always mounts. Make sure the file is writeable by the user you'll be running the proxy as. 
+
+try doing:
+```
+echo '2{enter}' > /path/to/keyspipe.txt
+```
+and verify that the autohotkey script changes the channel on your windows machine to 2.
+
+
+Install channel.py into /usr/local/bin, and edit it to reference the path to the keyspipe.txt file.
+
 run 
 ```
 curl http://ipv4-api.hdhomerun.com/discover > api.json
 ```
-Look in api.json and find "DiscoverURL" and "LineupURL" and grab those *substituting your URLs*:
+Look in api.json and find "DiscoverURL" and "LineupURL" and grab those *substituting your URLs*
+If your HDHR had the IP 192.168.0.41, you'd do:
 ```
 curl  "http://192.168.0.41:80/discover.json" > discover.json
 curl  "http://192.168.0.41:80/lineup.json" > lineup.json
@@ -48,10 +86,10 @@ curl  "http://192.168.0.41:80/lineup.json" > lineup.json
 
 Now rebuild the json files for the proxy *substituting your proxy ip*:
 ```
-./discover.py rpi.rhp.org discover.json discover-out.json
-./lineup.py rpi.rhp.org lineup.json lineup-out.json sources-out.json
+./discover.py 192.168.0.41 discover.json discover-out.json
+./lineup.py 192.168.0.41 lineup.json lineup-out.json sources-out.json
 ```
-And copy them to /var/www:
+And copy them to /var/www/html (or wherever your webroot is):
 ```
 sudo cp discover-out.json /var/www/html/discover.json
 sudo cp lineup-out.json /var/www/html/lineup.json
@@ -75,23 +113,7 @@ lineup_status.json I think you can just copy unchanged
 curl  "http://192.168.0.41:80/lineup_status.json" > /var/www/html/lineup.json
 ```
 
+You should now be able to log into your plex server's web console and go to Settings -> Server -> Live TV & DVR. Click Add Device. You will probably need to add your proxy manually by IP. Plex should see the proxy and let you add it. Follow the rest of the steps as normal.
 
-Proxy 65001 service (probably needed):
-(TBD)
-
-
-Proxy discovery api service (not sure if needed):
-
-Host hack/DNS hijack ipv4-api.hdhomerun.com to point to your proxy and use discover-api.py to generate your /discover file 
-
-
-Proxy the remaining ports (if needed):
-(TBD)
-
-
-
-
-
-
-
+Congratulations, you (hopefully) have Plex acting as a dvr against your proxy. 
 
